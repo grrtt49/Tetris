@@ -1,0 +1,41 @@
+#grid {
+	display: grid;
+	grid-template-columns: repeat(10, 6vw);
+}
+
+.block {
+	width: 6vw;
+	height: 6vw;
+}
+
+.blocktype-none {
+	background-color: lightgrey;
+}
+
+.blocktype-IBlock {
+	background-color: aqua;
+}
+
+.blocktype-JBlock {
+	background-color: blue;
+}
+
+.blocktype-LBlock {
+	background-color: orange;
+}
+
+.blocktype-OBlock {
+	background-color: gold;
+}
+
+.blocktype-SBlock {
+	background-color: limegreen;
+}
+
+.blocktype-TBlock {
+	background-color: mediumpurple;
+}
+
+.blocktype-ZBlock {
+	background-color: red;
+}
