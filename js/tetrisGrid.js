@@ -22,7 +22,7 @@ class TetrisGrid {
 		this.currentBlockType = BlockTypes.none;
 		this.currentBlockOrigin = null;
 		this.currentBlockRotation = 0;
-		for(let y = 0; y < this.height; y++) {
+		for(let y = 0; y < this.height + 2; y++) { //two extra hidden rows
 			this.blocks.push([]);
 			for(let x = 0; x < this.width; x++) {
 				this.blocks[y].push(new TetrisBlock());
@@ -32,8 +32,8 @@ class TetrisGrid {
 
 	drawGrid() {
 		var html = "";
-		for(let y = this.blocks.length - 1; y >= 0; y--) {
-			for(let x = 0; x < this.blocks[y].length; x++) {
+		for(let y = this.height - 1; y >= 0; y--) {
+			for(let x = 0; x < this.width; x++) {
 				html += this.blocks[y][x].getHTML();
 			}
 		}
@@ -48,10 +48,11 @@ class TetrisGrid {
 	}
 
 	isBlockInDirection(pos, vector, currentBlocks) {
-		if(pos.y + vector.y < 0 || pos.y + vector.y > this.height - 1 ||
-		   pos.x + vector.x < 0 || pos.x + vector.x > this.width - 1 ||
-		   (!this.isPosInCurrentBlocks(pos.plus(vector), currentBlocks) &&
-		   this.blocks[pos.y + vector.y][pos.x + vector.x].blockType != BlockTypes.none)) {
+		let newPos = pos.plus(vector);
+		if(newPos.y < 0 || newPos.y > this.height + 1 || //account for two hidden spaces
+		   newPos.x < 0 || newPos.x > this.width - 1 ||
+		   (!this.isPosInCurrentBlocks(newPos, currentBlocks) &&
+		   this.blocks[newPos.y][newPos.x].blockType != BlockTypes.none)) {
 			return true;
 		}
 		return false;
@@ -60,6 +61,7 @@ class TetrisGrid {
 	isPosInCurrentBlocks(pos, currentBlocks) {
 		for(let i = 0; i < currentBlocks.length; i++) {
 			if(currentBlocks[i].equals(pos)) {
+				//console.log("pos is a current block: ", pos, currentBlocks);
 				return true;
 			}
 		}
@@ -74,9 +76,14 @@ class TetrisGrid {
 
 	moveCurrentBlockInDirection(pos, vector) {
 		this.blocks[pos.y + vector.y][pos.x + vector.x].blockType = this.currentBlockType;		
-		pos.y += vector.y;
-		pos.x += vector.x;
+		pos.plusEquals(vector);
 		this.blocks[pos.y - vector.y][pos.x - vector.x].blockType = (this.isPosInCurrentBlocks(pos.minus(vector), this.currentBlocks) ? this.currentBlockType : BlockTypes.none);
+	}
+
+	moveAnyBlockInDirection(pos, vector, type) {
+		this.blocks[pos.y + vector.y][pos.x + vector.x].blockType = type;		
+		pos.plusEquals(vector);
+		this.blocks[pos.y - vector.y][pos.x - vector.x].blockType =  BlockTypes.none;
 	}
 
 	createCurrentBlock(blockType) {
@@ -84,15 +91,15 @@ class TetrisGrid {
 		this.currentBlockType = blockType;
 		this.currentBlockOrigin = null;
 		this.currentBlockRotation = 0;
-		var cBlock = new Pos(this.width / 2, this.height - 1);
+		var cBlock = new Pos(this.width / 2, this.height + 1); //start at top hidden row
 		
 		switch(blockType) {
 			case BlockTypes.IBlock:
-				this.currentBlocks.push(new Pos(cBlock.x - 1, cBlock.y));
-				this.currentBlockOrigin = new Pos(cBlock.x, cBlock.y);
+				this.currentBlocks.push(new Pos(cBlock.x - 1, cBlock.y - 1));
+				this.currentBlockOrigin = new Pos(cBlock.x, cBlock.y - 1);
 				this.currentBlocks.push(this.currentBlockOrigin);
-				this.currentBlocks.push(new Pos(cBlock.x + 1, cBlock.y));
-				this.currentBlocks.push(new Pos(cBlock.x + 2, cBlock.y));
+				this.currentBlocks.push(new Pos(cBlock.x + 1, cBlock.y - 1));
+				this.currentBlocks.push(new Pos(cBlock.x + 2, cBlock.y - 1));
 				break;
 			case BlockTypes.JBlock:
 				this.currentBlocks.push(new Pos(cBlock.x - 1, cBlock.y - 1));
@@ -137,7 +144,7 @@ class TetrisGrid {
 				this.currentBlocks.push(new Pos(cBlock.x + 1, cBlock.y - 1));
 				break;
 		}
-
+		//console.log("created block: ", this.currentBlocks);
 		this.setCurrentBlocksBlockType(blockType);
 	}
 
@@ -151,22 +158,37 @@ class TetrisGrid {
 	tic() {
 		if(!this.anyBlocksInDirection(new Pos(0, -1))) {
 			this.moveAllBlocksInDirection(new Pos(0, -1));
+			this.drawGrid();
+			return true;
 		}
-		this.drawGrid();
+		else {
+			this.drawGrid();
+			return false;
+		}
 	}
 
 	moveLeft() {
 		if(!this.anyBlocksInDirection(new Pos(-1, 0))) {
 			this.moveAllBlocksInDirection(new Pos(-1, 0));
+			this.drawGrid();
+			return true;
 		}
-		this.drawGrid();
+		else {
+			this.drawGrid();
+			return false;
+		}
 	}
 
 	moveRight() {
 		if(!this.anyBlocksInDirection(new Pos(1, 0))) {
 			this.moveAllBlocksInDirection(new Pos(1, 0));
+			this.drawGrid();
+			return true;
 		}
-		this.drawGrid();
+		else {
+			this.drawGrid();
+			return false;
+		}
 	}
 
 	rotateCurrentBlocks(isClockwise) {
@@ -177,12 +199,14 @@ class TetrisGrid {
 		}
 		if(!this.offsetAndCheckRotation(rotatedPositions, isClockwise)) {
 			console.log("Cannot rotate");
-			return;
+			this.setCurrentBlocksBlockType(this.currentBlockType);
+			return false;
 		}
 		this.setCurrentBlocksTo(rotatedPositions);
 		this.setCurrentBlocksBlockType(this.currentBlockType);
 		this.currentBlockRotation = (isClockwise ? this.currentBlockRotation + 1 : (this.currentBlockRotation - 1 < 0 ? 3 : this.currentBlockRotation - 1)) % 4;
 		this.drawGrid();
+		return true;
 	}
 
 	offsetAndCheckRotation(positions, isClockwise) {
@@ -193,7 +217,7 @@ class TetrisGrid {
 
 			var checkOffset = offsetData[this.currentBlockRotation][d].minus(offsetData[nextRotation][d]);
 			for(let i = 0; i < positions.length; i++) {
-				if(this.isBlockInDirection(positions[i], checkOffset, positions)) {
+				if(this.isBlockInDirection(positions[i], checkOffset, this.currentBlocks)) {
 					valid = false;	
 				}
 			}
@@ -233,6 +257,46 @@ class TetrisGrid {
 
 		let localRotatedPos = new Pos(dotProductX, dotProductY);
 		return this.currentBlockOrigin.plus(localRotatedPos);
+	}
+
+	checkForLines() {
+		var lines = [];
+		for(let y = this.height - 1; y >= 0; y--) {
+			let lineAvailable = true;
+			for(let x = 0; x < this.width; x++) {
+				if(this.blocks[y][x].blockType == BlockTypes.none) {
+					lineAvailable = false;
+					break;
+				}
+			}
+			if(lineAvailable) {
+				lines.push(y);
+			}
+		}
+
+		this.clearLines(lines);
+	}
+
+	clearLines(lines) {
+		for(let i = 0; i < lines.length; i++) {
+			var y = lines[i];
+			for(let x = 0; x < this.width; x++) {
+				this.blocks[y][x].blockType = BlockTypes.none;
+			}
+			this.moveAllRowsDownAbove(y + 1);
+		}
+	}
+
+	moveAllRowsDownAbove(startY) {
+		for(var y = startY; y < this.height; y++) {
+			this.moveRowDown(y);
+		}
+	}
+
+	moveRowDown(y) {
+		for(let x = 0; x < this.width; x++) {
+			this.moveAnyBlockInDirection(new Pos(x, y), new Pos(0, -1), this.blocks[y][x].blockType);
+		}
 	}
 	
 }

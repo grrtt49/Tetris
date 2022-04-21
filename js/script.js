@@ -1,4 +1,4 @@
-var game = new TetrisGame("#grid", 1000);
+var game = new TetrisGame("#grid", "#next-pieces", 1000);
 
 $(document).ready(function(){
 	game.grid.drawGrid();
@@ -16,13 +16,28 @@ $(document).ready(function(){
 				game.moveLeft();
 				break;
 			case 32: //space
-				game.tic();
+				game.hardDrop();
 				break;
-			case 88:
+			case 38: //up
+			case 88: //x
 				game.rotateCurrentBlock(true);
 				break;
-			case 90:
+			case 40: //down
+				game.dropBlock();
+				break;
+			case 90: //z
 				game.rotateCurrentBlock(false);
+				break;
+		}
+	});
+
+	$(document).keyup(function(e) {
+		e.preventDefault();
+		var keyCode = (e.keyCode ? e.keyCode : e.which);
+		
+		switch(keyCode) {
+			case 40: //down
+				game.stopDroppingBlock();
 				break;
 		}
 	});

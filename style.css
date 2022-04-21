@@ -1,19 +1,57 @@
+html {
+	background-color: #333;
+	color: white;
+	font-family: Helvetica;
+}
+
+#game {
+	width: calc(min(8vw, 4.5vh) * 10);
+	margin: 0 auto;
+	position: relative;
+}
+
 #grid {
 	display: grid;
-	grid-template-columns: repeat(10, 6vw);
+	grid-template-columns: repeat(10, min(8vw, 4.5vh));
+}
+
+#next-pieces {
+	width: calc((min(8vw, 4.5vh) * 4) + 30px);
+	position: absolute;
+	left: 100%;
+	top: 0;
+	text-align: center;
+}
+
+.block-queue-item {
+	display: grid;
+	grid-template-columns: repeat(4, min(8vw, 4.5vh));
+	margin: 5px;
+	padding: 10px;
+	background-color: #444;
+	border-radius: 5px;
+}
+
+.block-queue-item div {
+	width: min(8vw, 4.5vh);
+	height: min(8vw, 4.5vh);
 }
 
 .block {
-	width: 6vw;
-	height: 6vw;
+	width: min(8vw, 4.5vh);
+	height: min(8vw, 4.5vh);
+	outline: 1px solid #444;
+
+	box-shadow: inset -3px -3px 0px 0px rgba(0, 0, 0, 0.35), 
+				inset 3px 3px 0px 0px rgba(255, 255, 255, 0.25);
 }
 
 .blocktype-none {
-	background-color: lightgrey;
+	background-color: #444;
 }
 
 .blocktype-IBlock {
-	background-color: aqua;
+	background-color: #00dddd;
 }
 
 .blocktype-JBlock {
