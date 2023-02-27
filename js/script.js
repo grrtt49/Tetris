@@ -1,4 +1,5 @@
 var game = new TetrisGame("#grid", "#next-pieces", 1000);
+var isDropping = false;
 
 $(document).ready(function(){
 	game.grid.drawGrid();
@@ -23,11 +24,16 @@ $(document).ready(function(){
 				game.rotateCurrentBlock(true);
 				break;
 			case 40: //down
-				game.dropBlock();
+				if(!isDropping) {
+					game.dropBlock();
+					isDropping = true;
+				}
 				break;
 			case 90: //z
 				game.rotateCurrentBlock(false);
 				break;
+			case 67: //c
+				game.holdCurrentPiece();
 		}
 	});
 
@@ -38,6 +44,7 @@ $(document).ready(function(){
 		switch(keyCode) {
 			case 40: //down
 				game.stopDroppingBlock();
+				isDropping = false;
 				break;
 		}
 	});

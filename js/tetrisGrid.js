@@ -8,11 +8,13 @@ class TetrisGrid {
 	currentBlockRotation;
 	width;
 	height;
+	isDrawingGridBlocked;
 	
 	constructor(gridSelector, width, height) {
 		this.gridSelector = gridSelector;
 		this.width = width;
 		this.height = height;
+		this.isDrawingGridBlocked = false;
 		this.initBlocks();
 	}
 
@@ -25,19 +27,21 @@ class TetrisGrid {
 		for(let y = 0; y < this.height + 2; y++) { //two extra hidden rows
 			this.blocks.push([]);
 			for(let x = 0; x < this.width; x++) {
-				this.blocks[y].push(new TetrisBlock());
+				this.blocks[y].push(new TetrisBlock(x, y));
 			}
 		}
 	}
 
 	drawGrid() {
-		var html = "";
-		for(let y = this.height - 1; y >= 0; y--) {
-			for(let x = 0; x < this.width; x++) {
-				html += this.blocks[y][x].getHTML();
+		if(!this.isDrawingGridBlocked) {
+			var html = "";
+			for(let y = this.height - 1; y >= 0; y--) {
+				for(let x = 0; x < this.width; x++) {
+					html += this.blocks[y][x].getHTML();
+				}
 			}
+			$(this.gridSelector).html(html);
 		}
-		$(this.gridSelector).html(html);
 	}
 
 	anyBlocksInDirection(vector) {
@@ -95,11 +99,11 @@ class TetrisGrid {
 		
 		switch(blockType) {
 			case BlockTypes.IBlock:
-				this.currentBlocks.push(new Pos(cBlock.x - 1, cBlock.y - 1));
-				this.currentBlockOrigin = new Pos(cBlock.x, cBlock.y - 1);
+				this.currentBlocks.push(new Pos(cBlock.x - 1, cBlock.y));
+				this.currentBlockOrigin = new Pos(cBlock.x, cBlock.y);
 				this.currentBlocks.push(this.currentBlockOrigin);
-				this.currentBlocks.push(new Pos(cBlock.x + 1, cBlock.y - 1));
-				this.currentBlocks.push(new Pos(cBlock.x + 2, cBlock.y - 1));
+				this.currentBlocks.push(new Pos(cBlock.x + 1, cBlock.y));
+				this.currentBlocks.push(new Pos(cBlock.x + 2, cBlock.y));
 				break;
 			case BlockTypes.JBlock:
 				this.currentBlocks.push(new Pos(cBlock.x - 1, cBlock.y - 1));
@@ -259,7 +263,7 @@ class TetrisGrid {
 		return this.currentBlockOrigin.plus(localRotatedPos);
 	}
 
-	checkForLines() {
+	checkForLines(animationDelay=0) {
 		var lines = [];
 		for(let y = this.height - 1; y >= 0; y--) {
 			let lineAvailable = true;
@@ -274,10 +278,12 @@ class TetrisGrid {
 			}
 		}
 
-		this.clearLines(lines);
+		this.clearLines(lines, animationDelay);
+		return lines.length;
 	}
 
-	clearLines(lines) {
+	clearLines(lines, animationDelay=0) {
+		this.animateLinesRemoved(lines, animationDelay);
 		for(let i = 0; i < lines.length; i++) {
 			var y = lines[i];
 			for(let x = 0; x < this.width; x++) {
@@ -285,6 +291,47 @@ class TetrisGrid {
 			}
 			this.moveAllRowsDownAbove(y + 1);
 		}
+	}
+
+	animateLinesRemoved(lines, animationDelay=0) {
+		if(lines.length > 0)
+			this.isDrawingGridBlocked = true;
+		var rowHtml = "";
+		for(let i = 0; i < lines.length; i++) {
+			var y = lines[i];
+			for(let x = 0; x < this.width; x++) {
+				var offset = $("#block-pos-" + x + "-" + y).offset();
+				rowHtml += "<div style='left: "+offset.left+"px; top: "+offset.top+"px;' class='animate-block block blocktype-" + this.blocks[y][x].blockType.name + "'></div>";
+			}
+		}
+		$("#game").after(rowHtml);
+		
+		var duration = this.getDurationFromHeight(y);
+		$(".animate-block").each(function() {
+			var offset = $(this).offset();
+			var newLeft = offset.left + (Math.floor(Math.random() * 300) - 150);
+			$(this).delay(animationDelay).animate({
+					'top':'100%', 
+				 	'left':newLeft + 'px'
+				}, {
+				    duration: duration,
+				    specialEasing: {
+				      top: "easeInBack",
+				      left: "easeInQuad"
+				    }, 
+					start: function() {
+						$(this).animateRotate(Math.floor(Math.random() * 400) - 200, duration, 'linear');
+					},
+					complete: function() {
+						$(this).remove();
+					}
+				}
+			);
+		});
+	}
+
+	getDurationFromHeight(y, g=10) {
+		return Math.sqrt(2 * ((y + 1) / g)) * 1000;
 	}
 
 	moveAllRowsDownAbove(startY) {
@@ -300,3 +347,17 @@ class TetrisGrid {
 	}
 	
 }
+
+$.fn.animateRotate = function(angle, duration, easing, complete) {
+  var args = $.speed(duration, easing, complete);
+  var step = args.step;
+  return this.each(function(i, e) {
+    args.complete = $.proxy(args.complete, e);
+    args.step = function(now) {
+      $.style(e, 'transform', 'rotate(' + now + 'deg)');
+      if (step) return step.apply(e, arguments);
+    };
+
+    $({deg: 0}).animate({deg: angle}, args);
+  });
+};

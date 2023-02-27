@@ -1,12 +1,6 @@
 /* 
 TODO:
 
-Levels
-	speed increase
-
-Scoring
-
-Hold Piece
 Sound effects:
 	on rotation, 
 	movement, 
@@ -16,6 +10,8 @@ Sound effects:
 	line clear
 	game over
 	music:  Korobeiniki
+
+Animation
 
 Recognize T-spins
 
@@ -40,6 +36,15 @@ class TetrisGame {
 	blocksQueue;
 	grabBag;
 	gameOver;
+	level;
+	score;
+	untilGoal;
+	gameTimeout;
+	isSoftDropping;
+	startHardDrop;
+	endHardDrop;
+	pieceHolding;
+	switchedHoldingThisTurn;
 	
 	constructor(gridSelector, nextPiecesSelector, startSpeed) {
 		this.paused = false;
@@ -52,10 +57,78 @@ class TetrisGame {
 		this.lastMoveTime = 0;
 		this.score = 0;
 		this.gameOver = false;
+		this.level = 1;
+		this.score = 0;
+		this.untilGoal = 10;
+		this.startHardDrop = 0;
+		this.endHardDrop = 0;
+		this.isSoftDropping = false;
+		this.pieceHolding = null;
+		this.switchedHoldingThisTurn = false;
 		this.resetGrabBag();
 		this.initQueue(6);
 		this.createBlock();
+		this.drawHeldPiece();
 		this.playLoop();
+	}
+
+	drawHeldPiece() {
+		$("#hold-container").html("Held: <br>" + this.getNextPieceBlock(this.pieceHolding));
+	}
+
+	holdCurrentPiece() {
+		if(this.pieceHolding == null) {
+			this.switchedHoldingThisTurn = true;
+			this.pieceHolding = this.grid.currentBlockType;
+			this.drawHeldPiece();
+			this.grid.setCurrentBlocksBlockType(BlockTypes.none);
+			this.createBlock();
+			this.grid.drawGrid();
+			return;
+		}
+		
+		//already one being held
+		if(!this.switchedHoldingThisTurn) {
+			this.switchedHoldingThisTurn = true;
+			var temp = this.grid.currentBlockType;
+			this.grid.setCurrentBlocksBlockType(BlockTypes.none);
+			this.grid.createCurrentBlock(this.pieceHolding);
+			this.pieceHolding = temp;
+			this.drawHeldPiece();
+			var moved = this.grid.tic();
+			if(!moved) {
+				this.gameOver = true;
+				console.log("GAME OVER!");
+			}
+		}
+	}
+
+	nextLevel() {
+		this.level++;
+		var changeCurrentSpeed = (this.currentSpeed == this.normalSpeed);
+		this.normalSpeed = Math.pow(0.8-((this.level-1)*0.007), this.level-1) * 1000;
+		if(changeCurrentSpeed) {
+			this.currentSpeed = this.normalSpeed;
+		}
+		console.log("Level up! New speed: " + this.normalSpeed);
+	}
+
+	numLinesCleared(num) {
+		if(num > 0) {
+			var goalSubtract = this.goalValueByNumberOfLines(num);
+			this.untilGoal -= goalSubtract;
+			if(this.untilGoal <= 0) {
+				this.untilGoal += 10;
+				this.nextLevel();
+			}
+			//TODO: before or after changing levels
+			var scoreValue = goalSubtract * 100 * this.level; 
+			this.score += scoreValue;
+		}
+	}
+
+	goalValueByNumberOfLines(num) {
+		return[0, 1, 3, 5, 8][num];
 	}
 
 	shuffleArray(array) {
@@ -131,6 +204,10 @@ class TetrisGame {
 				blockContent = "<div class='block blocktype-ZBlock'></div><div class='block blocktype-ZBlock'></div><div></div><div></div>" +
 					"<div></div><div class='block blocktype-ZBlock'></div><div class='block blocktype-ZBlock'></div><div></div>";;
 				break;
+			case null:
+				blockContent = "<div></div><div></div><div></div><div></div>" +
+					"<div></div><div></div><div></div><div></div>";;
+				break;
 		}
 		
 		return "<div class='block-queue-item'>"+blockContent+"</div>";
@@ -140,21 +217,31 @@ class TetrisGame {
 		//if block fails to move down, set it to rest and create a new block
 		var moved = this.grid.tic();
 		if(!moved) { 
-			this.grid.checkForLines();
+			var numLines = this.grid.checkForLines();
+			this.switchedHoldingThisTurn = false;
 			this.createBlock();
+			this.numLinesCleared(numLines);
+		}
+		else if(this.isSoftDropping) {
+			this.score++;
 		}
 		this.drawScore();
 	}
 
 	drawScore() {
-		
+		var html = "Score: " + this.score; 
+		html += "<br>Level: " + this.level;
+		html += "<br>Goal: " + this.untilGoal;
+
+		$("#score-container").html(html);
 	}
 
 	playLoop() {
 		var timeLeft = Date.now() - this.lastMoveTime;
 		if(this.grid.anyBlocksInDirection(new Pos(0, -1)) && 
 		   timeLeft < this.lockDelay) { //account for lock delay
-			setTimeout(function() {
+			clearTimeout(this.gameTimeout);
+			this.gameTimeout = setTimeout(function() {
 				if(!this.gameOver) {
 					this.playLoop();
 				}
@@ -162,7 +249,8 @@ class TetrisGame {
 		}
 		else { //only tic if it is not in lock delay 
 			this.tic();
-			setTimeout(function() {
+			clearTimeout(this.gameTimeout);
+			this.gameTimeout = setTimeout(function() {
 				if(!this.gameOver) {
 					this.playLoop();
 				}
@@ -172,8 +260,9 @@ class TetrisGame {
 
 	createBlock() {
 		this.grid.createCurrentBlock(this.popAndReloadQueue());
-		var moved = this.grid.tic();
-		if(!moved) {
+		var moved1 = this.grid.tic();
+		var moved2 = this.grid.tic();
+		if(!moved1 || !moved2) {
 			this.gameOver = true;
 			console.log("GAME OVER!");
 		}
@@ -199,24 +288,74 @@ class TetrisGame {
 	}
 
 	dropBlock() {
+		this.isSoftDropping = true;
 		this.currentSpeed = this.fastSpeed;
+		this.playLoop();
 	}
 
 	stopDroppingBlock() {
+		this.isSoftDropping = false;
 		this.currentSpeed = this.normalSpeed;
 	}
 
-	hardDrop() {
+	hardDrop(start = true) {
+		if(start) {
+			this.startHardDrop = JSON.parse(JSON.stringify(this.grid.currentBlocks)); //clone positions
+		}
+		
 		if(!this.gameOver) {
 			var moved = this.grid.tic();
 			if(!moved) { 
-				this.grid.checkForLines();
+				this.endHardDrop = JSON.parse(JSON.stringify(this.grid.currentBlocks)); //clone positions
+				if(!start) {
+					var delay = this.animateDrop();
+				}
+					
+				var numLines = this.grid.checkForLines(delay);
+				this.switchedHoldingThisTurn = false;
 				this.createBlock();
+				this.numLinesCleared(numLines);
 			}
 			else {
-				this.hardDrop();
+				this.score += 2;
+				this.hardDrop(false);
 			}
 		}
+	}
+
+	animateDrop() {
+		var boxesHTML = "";
+		for(let i = 0; i < this.startHardDrop.length; i++) {
+			var offset = $("#block-pos-" + this.startHardDrop[i].x + "-" + this.startHardDrop[i].y).offset();
+			if(offset != undefined)
+				boxesHTML += "<div id='animate-drop-"+ this.startHardDrop[i].x + "-" + this.startHardDrop[i].y+"' style='left: "+offset.left+"px; top: "+offset.top+"px;' class='animate-drop-block block blocktype-" + this.grid.currentBlockType.name + "'></div>";
+			else 
+				console.log("Undefined! POS: ", this.startHardDrop[i]);
+			var endOffset = $("#block-pos-" + this.endHardDrop[i].x + "-" + this.endHardDrop[i].y).offset();
+			boxesHTML += "<div id='animate-drop-"+ this.endHardDrop[i].x + "-" + this.endHardDrop[i].y+"' style='left: "+endOffset.left+"px; top: "+endOffset.top+"px; z-index:6;' class='animate-drop-block block blocktype-" + BlockTypes.none.name + "'></div>";
+		}
+		$("#game").after(boxesHTML);
+
+		for(let i = 0; i < this.startHardDrop.length; i++) {
+			var animateBlock = $("#animate-drop-"+ this.startHardDrop[i].x + "-" + this.startHardDrop[i].y);
+			var endBlock = $("#block-pos-"+ this.endHardDrop[i].x + "-" + this.endHardDrop[i].y);
+			var endOffset = endBlock.offset();
+			var duration = this.grid.getDurationFromHeight(this.startHardDrop[i].y - this.endHardDrop[i].y, 500);
+			$(animateBlock).animate({'top': endOffset.top + 'px'}, duration, 'easeInQuad', 
+				function() {
+					$(this).remove();
+				}
+			);
+		}
+		var endHardDropLocal = JSON.parse(JSON.stringify(this.endHardDrop));
+		setTimeout(function() {
+			this.grid.isDrawingGridBlocked = false;
+			this.grid.drawGrid();
+			for(var i = 0; i < endHardDropLocal.length; i++) {
+				$("#animate-drop-"+ endHardDropLocal[i].x + "-" + endHardDropLocal[i].y).remove();
+			}
+		}.bind(this), duration);
+		return duration;
 	}
 
 	pause() {
